@@ -1,0 +1,24 @@
+# Framework MCP
+fastmcp>=3.0.0
+mcp>=1.0.0
+
+# Intégrations
+PyGithub>=2.0        # API GitHub REST + Actions
+docker>=7.0          # SDK Docker (déploiement & rollback)
+ollama               # LLM local (Qwen 3.5 / Gemma 4)
+
+# Sécurité & Auth
+python-jose[cryptography]  # JWT
+python-keycloak       # Client OIDC Keycloak
+python-dotenv         # Variables d'environnement
+httpx                 # HTTP pour Keycloak
+semgrep               # SAST (analyse statique)
+pip-audit             # Audit de dépendances (CVE)
+
+# Qualité & Dev
+pytest
+pytest-asyncio
+pytest-cov
+coverage
+black
+loguru                # Journalisation structurée

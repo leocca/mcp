@@ -1,0 +1,395 @@
+{
+  "tools": [
+    {
+      "name": "git_status",
+      "description": "Retourne l'état actuel du dépôt cible.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "git_diff",
+      "description": "Récupère les changements d'un commit (analyse ciblée).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "commit_sha": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "commit_sha"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "git_log",
+      "description": "Retourne l'historique des commits récents.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "limit": {
+            "default": 10,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "search_code",
+      "description": "Recherche une chaîne dans le code local (git grep).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "path": {
+            "default": ".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "query"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "analyze_pr",
+      "description": "(IA) Analyse les bugs logiques d'une PR GitHub.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "pr_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "pr_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "suggest_review",
+      "description": "(IA) Génère des commentaires de revue de code pour une PR.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "pr_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "pr_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_pipeline_status",
+      "description": "Surveille le dernier statut des workflows GitHub Actions.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "limit": {
+            "default": 3,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "trigger_pipeline",
+      "description": "*Déclenchement CI* : relance un workflow GitHub Actions.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "workflow_file": {
+            "default": "",
+            "type": "string"
+          },
+          "dry_run": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "token",
+          "branch"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_deployment_info",
+      "description": "Liste l'état des conteneurs Docker (déploiements en cours).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_container_logs",
+      "description": "Journalise les logs d'un conteneur avec filtrage automatique des secrets.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "container_id": {
+            "type": "string"
+          },
+          "tail": {
+            "default": 50,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "container_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "rollback_deployment",
+      "description": "*Retour arrière* : repositionne le déploiement sur une image antérieure.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "image_tag": {
+            "type": "string"
+          },
+          "dry_run": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "token",
+          "image_tag"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "delete_docker_container",
+      "description": "*Action destructive* : supprime un conteneur Docker (rôle ADMIN + HITL).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Jeton d'accès Keycloak (OIDC)."
+          },
+          "container_id": {
+            "type": "string",
+            "description": "Identifiant ou nom du conteneur."
+          },
+          "dry_run": {
+            "default": true,
+            "type": "boolean",
+            "description": "Si True (défaut), simule l'action sans effet système."
+          }
+        },
+        "required": [
+          "token",
+          "container_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "run_tests",
+      "description": "Exécute la suite pytest et retourne le rapport succès/échec.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "path": {
+            "default": "tests",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_coverage",
+      "description": "Mesure le taux de couverture de code (pytest --cov).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "path": {
+            "default": "tests",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "scan_vulnerabilities",
+      "description": "Lance un scan SAST Semgrep (critiques filtrées).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "check_dependencies",
+      "description": "Audite les dépendances (pip-audit) et remonte les CVE.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "Liste les tickets (issues) du dépôt cible.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "state": {
+            "default": "open",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "create_issue",
+      "description": "Crée un ticket sur le dépôt cible.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "title"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "generate_doc",
+      "description": "(IA) Génère une documentation Markdown depuis les docstrings.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      }
+    }
+  ]
+}

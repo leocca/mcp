@@ -1,0 +1,8 @@
+rules:
+  - id: no-eval
+    languages: [python]
+    message: 'eval() detected - code injection risk'
+    severity: WARNING
+    patterns:
+      - pattern: eval(...)
+      - pattern: exec(...)

@@ -6,3 +6,5 @@ __pycache__/
 audit.log
 .coverage
 htmlcov/
+demo/.git/
+demo/.pytest_cache/

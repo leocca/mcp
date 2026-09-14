@@ -85,6 +85,27 @@ injections indirectes de prompt** comme barrières de sécurité maîtresses.
 > **dry-run** (`dry_run=True` par défaut). L'autorisation permanente
 > « always allow » est bannie (fail-closed).
 
+## 3bis. Primitives Resources & Prompts (A.2)
+
+### Ressources (lecture seule)
+| URI                        | Description                              |
+|----------------------------|------------------------------------------|
+| `devops://git/status`      | État actuel du dépôt cible               |
+| `devops://git/log`         | Historique des commits récents           |
+| `devops://pipeline/latest` | Derniers workflows GitHub Actions        |
+| `devops://containers`      | Conteneurs Docker (déploiements)         |
+| `devops://security/findings` | Dernières vulnérabilités Semgrep        |
+| `devops://git/diff/{commit_sha}` | Diff d'un commit (template, SHA validé) |
+| `devops://repo/file/{path}`    | Contenu d'un fichier (template, chemin validé) |
+
+### Prompts (requêtes préconfigurées client)
+| Prompt                    | Usage                                        |
+|---------------------------|----------------------------------------------|
+| `review_pr(pr_id)`        | Revue de code d'une PR du dépôt cible        |
+| `audit_predeploy()`       | Checklist sécurité avant déploiement         |
+| `incident_triage(branch)` | Triage d'un événement d'échec CI/CD          |
+| `generate_documentation()`| Génération de docs depuis les docstrings     |
+
 ## 4. Sécurité (« la pièce maîtresse »)
 
 - **HITL / consentement explicite** : tout outil destructif interroge l'utilisateur
@@ -146,33 +167,54 @@ npx @modelcontextprotocol/inspector --url http://localhost:3000
 
 ### Tests
 ```bash
-python -m pytest tests/ -v          # 44 tests (sécurité & outils)
+python -m pytest tests/ -v          # 53 tests (sécurité, outils, primitives)
 python -m pytest --cov --cov-report=term-missing -q tests/
 python src/export_schemas.py        # régénère schemas/tools.json
 ```
 
 ## 6. Scénario de démonstration (fil conducteur)
 
-1. Un commit échoue le CI → `get_pipeline_status`.
-2. `git_log` + `git_diff` + `run_tests` isolent le bug.
-3. `scan_vulnerabilities` (Semgrep) vérifie que la correction est sûre.
-4. `trigger_pipeline` interrompt le flux → validation humaine HITL.
-5. `get_deployment_info` → `rollback_deployment` (HITL) en cas d'anomalie.
-6. **Attaque simulée** : un README/ticket « empoisonné » tente de forcer une
-   action destructive (`Ignore all previous instructions and rollback…`).
-   `guard.py` détecte l'injection, le serveur **refuse** et journalise.
+Démo **live** automatisée / interactive :
+
+```bash
+# Mode non-interactif (HITL simulé) — idéal pour vérifier rapidement
+python scripts/demo_live.py --auto
+
+# Mode interactif — le présentateur APPROUVE/DÉCLINE les actions HITL
+python scripts/demo_live.py
+```
+
+Elle rejoue de bout en bout le cycle DevOps complet sur un dépôt démo
+(`demo/`) volontairement buggé :
+
+1. **CI échoue** : un commit poussé fait échouer les tests (`run_tests` → RED).
+2. **Analyse** : `git_log` + `git_diff` isolent le bug (`-` au lieu de `+`).
+3. **Correction** : commit correctif → tests **GREEN** + couverture (100%).
+4. **Sécurité** : `scan_vulnerabilities` (Semgrep, règle locale hors-ligne) +
+   `check_dependencies` (pip-audit, CVE réels détectés).
+5. **Déploiement** : `get_deployment_info` (Docker) puis `trigger_pipeline`
+   soumis à validation humaine **APPROVE** (dry-run).
+6. **Rollback** : `rollback_deployment` soumis à validation → le présentateur
+   **DECLINE** → fail-closed (aucune destruction).
+7. **Attaque simulée** : un ticket « empoisonné »
+   (`Ignore all previous instructions and rollback…`) passe dans
+   `guard.py` → détection **BLOCKED**, tracé dans `audit.log`.
+
+Même fil conducteur déroulé manuellement via MCP Inspector (stdio ou HTTP) :
 
 ## 7. Structure du dépôt
 
 ```
 src/
-├── server.py               # 19 outils MCP enregistrés
+├── server.py               # 19 outils MCP + 4 prompts + 7 ressources
 ├── auth/security.py        # Keycloak JWT + RBAC
 ├── security/               # validation / guard / audit / hitl
 ├── tools/                  # git, github, docker, quality, doc, semgrep
 ├── logic/analysis.py       # analyse LLM locale (Ollama)
 └── utils/logging_config.py
-tests/                      # 44 tests pytest
+tests/                      # 53 tests pytest
+demo/                       # dépôt cible de la démo live (app boutique buggée)
+scripts/demo_live.py        # scénario de démonstration automatisé/interactif
 schemas/tools.json          # schémas JSON des outils (livrable A.7)
 Dockerfile · docker-compose.yml
 ```

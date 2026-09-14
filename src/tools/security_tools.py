@@ -3,7 +3,7 @@ import json
 import os
 from loguru import logger
 
-def run_semgrep_scan():
+def run_semgrep_scan(cwd=None):
     """Lance un scan de sécurité statique avec Semgrep."""
     logger.info("Démarrage du scan Semgrep...")
     try:
@@ -12,7 +12,9 @@ def run_semgrep_scan():
         result = subprocess.run(
             ["semgrep", "scan", "--config=auto", "--json", "."],
             capture_output=True,
-            text=True
+            text=True,
+            cwd=cwd,
+            timeout=300,
         )
         
         # On parse le JSON pour ne retourner que l'essentiel
@@ -44,7 +46,9 @@ def run_pip_audit():
             return "✅ Aucune vulnérabilité trouvée dans les dépendances."
 
         data = json.loads(result.stdout)
-        # pip-audit renvoie une liste de dépendances, on filtre celles qui ont des vulnérabilités
+        # pip-audit >= 2.x renvoie {"dependencies": [...]} ; plus anciens : liste directe
+        if isinstance(data, dict):
+            data = data.get("dependencies", [])
         vulnerabilities = [d for d in data if d.get("vulns")]
         
         if not vulnerabilities:

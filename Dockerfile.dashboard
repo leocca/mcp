@@ -1,0 +1,19 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY dashboard/requirements.txt ./dashboard/requirements.txt
+RUN pip install --no-cache-dir -r dashboard/requirements.txt
+
+COPY dashboard/ dashboard/
+COPY audit.log /data/audit.log
+
+ENV PYTHONPATH=/app
+ENV AUDIT_LOG_FILE=/data/audit.log
+
+RUN groupadd -r dash && useradd -r -g dash dash
+USER dash
+
+EXPOSE 5000
+
+CMD ["python", "-m", "dashboard.app"]

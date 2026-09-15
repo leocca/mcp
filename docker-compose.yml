@@ -22,6 +22,8 @@ services:
       KC_DB_PASSWORD: password
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "true"
     ports:
       - "8080:8080"
     depends_on:
@@ -36,6 +38,23 @@ services:
       LOG_LEVEL: INFO
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./audit.log:/app/audit.log
+    depends_on:
+      - keycloak
+    networks:
+      - keycloak_network
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    env_file: .env
+    environment:
+      AUDIT_LOG_FILE: /data/audit.log
+    volumes:
+      - ./audit.log:/data/audit.log:ro
+    ports:
+      - "5000:5000"
     depends_on:
       - keycloak
     networks:

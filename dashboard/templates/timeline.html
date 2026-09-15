@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline des actions{% endblock %}
+{% block page_title %}Timeline des actions auditées{% endblock %}
+
+{% block content %}
+<!-- Filtres -->
+<form id="filter-form" class="card border-0 shadow-sm mb-3 d-print-none">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small mb-1">Outil</label>
+                <select class="form-select form-select-sm" id="filter-tool" name="tool">
+                    <option value="">Tous</option>
+                    {% for t in tools %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small mb-1">Utilisateur</label>
+                <select class="form-select form-select-sm" id="filter-user" name="user">
+                    <option value="">Tous</option>
+                    {% for u in users %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small mb-1">Verdict</label>
+                <select class="form-select form-select-sm" id="filter-verdict" name="verdict">
+                    <option value="">Tous</option>
+                    {% for v in verdicts %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small mb-1">Statut</label>
+                <select class="form-select form-select-sm" id="filter-status" name="status">
+                    <option value="">Tous</option>
+                    {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <label class="form-label small mb-1">Du</label>
+                <input type="date" class="form-control form-control-sm" id="filter-date-from" name="date_from">
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <label class="form-label small mb-1">Au</label>
+                <input type="date" class="form-control form-control-sm" id="filter-date-to" name="date_to">
+            </div>
+        </div>
+        <div class="row g-2 mt-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label small mb-1">Recherche libre</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" id="filter-search" name="search"
+                           placeholder="Tool, user, param, detail…">
+                    <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <select class="form-select form-select-sm d-inline-block w-auto" id="per-page">
+                    <option value="25">25 / page</option>
+                    <option value="50" selected>50 / page</option>
+                    <option value="100">100 / page</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-light" id="btn-reset"><i class="bi bi-arrow-counterclockwise"></i> Réinitialiser</button>
+                <a href="#" class="btn btn-sm btn-outline-secondary" id="btn-export-csv"><i class="bi bi-filetype-csv"></i> CSV</a>
+                <a href="#" class="btn btn-sm btn-outline-secondary" id="btn-export-json"><i class="bi bi-download"></i> JSON</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="text-muted mb-0"><span id="result-count">0</span> résultat(s)</h6>
+    <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+</div>
+
+<!-- Table Timeline -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-dark align-middle mb-0" id="timeline-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;"></th>
+                        <th>Horodatage</th>
+                        <th>Outil</th>
+                        <th>Utilisateur</th>
+                        <th>Verdict</th>
+                        <th>Statut</th>
+                        <th>Détail</th>
+                        <th style="width:40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="8" class="text-center text-muted py-4">Chargement…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de détail -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-braces-asterisk"></i> Détail de l'action</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detail-body">
+                <p class="text-muted">Chargement…</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
+{% endblock %}

@@ -36,6 +36,12 @@ services:
     env_file: .env
     environment:
       LOG_LEVEL: INFO
+      MCP_TRANSPORT: http
+      FASTMCP_HOST: 0.0.0.0
+      FASTMCP_PORT: 3000
+      KEYCLOAK_URL: http://keycloak:8080
+    ports:
+      - "3000:3000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./audit.log:/app/audit.log
@@ -51,12 +57,18 @@ services:
     env_file: .env
     environment:
       AUDIT_LOG_FILE: /data/audit.log
+      MCP_SERVER_URL: http://mcp-server:3000/mcp
+      KEYCLOAK_URL: http://host.docker.internal:8080
+      DASHBOARD_REDIRECT_URI: http://localhost:5000/callback
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./audit.log:/data/audit.log:ro
     ports:
       - "5000:5000"
     depends_on:
       - keycloak
+      - mcp-server
     networks:
       - keycloak_network
 

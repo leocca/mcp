@@ -35,6 +35,11 @@
                             <i class="bi bi-list-ul"></i> Timeline des actions
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active == 'tools' %}active{% endif %}" href="{{ url_for('tools_view') }}">
+                            <i class="bi bi-tools"></i> Console MCP
+                        </a>
+                    </li>
                 </ul>
                 <div class="sidebar-footer mt-auto px-3 py-3 border-top">
                     <div class="d-flex align-items-center justify-content-between">

@@ -143,7 +143,8 @@ def create_report():
         "7. Déploiement",
         "8. Tests",
         "9. Démonstration",
-        "10. Conclusion",
+        "10. Dashboard Monitoring",
+        "11. Conclusion",
     ]
     for item in toc_items:
         p = doc.add_paragraph(item)
@@ -240,6 +241,13 @@ def create_report():
         ("Tests", "pytest + pytest-cov", "9.1.1 / 7.1.0"),
         ("Logging", "Loguru", "0.7.3"),
         ("Base de données", "PostgreSQL", "15"),
+        ("Dashboard Backend", "Flask", "3.0+"),
+        ("OIDC Dashboard", "Authlib", "1.3+"),
+        ("CSS Framework", "Bootstrap", "5.3.3"),
+        ("Icônes", "Bootstrap Icons", "1.11.3"),
+        ("Graphiques", "Chart.js", "4.4.4"),
+        ("Temps Réel", "SSE (EventSource)", "—"),
+        ("Templating", "Jinja2 (Flask)", "—"),
     ]
     add_styled_table(doc, ["Domaine", "Technologie", "Version"], stack, [4, 5, 3])
 
@@ -426,9 +434,11 @@ def create_report():
 
     doc.add_heading("7.1 Dockerfile", level=2)
     doc.add_paragraph(
-        "Image Python 3.10-slim, utilisateur non-root (mcp), point d'entrée stdio par défaut."
+        "Deux images Docker : le serveur MCP (Python 3.10-slim, utilisateur non-root 'mcp') "
+        "et le dashboard (Python 3.10-slim, utilisateur non-root 'dash')."
     )
     add_code_block(doc, """
+# Serveur MCP
 FROM python:3.10-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends git
@@ -440,14 +450,29 @@ RUN groupadd -r mcp && useradd -r -g mcp mcp
 USER mcp
 EXPOSE 3000
 ENTRYPOINT ["python", "-m", "src.server"]
-""", "Dockerfile")
+
+# Dashboard
+FROM python:3.10-slim
+WORKDIR /app
+COPY dashboard/requirements.txt ./dashboard/requirements.txt
+RUN pip install --no-cache-dir -r dashboard/requirements.txt
+COPY dashboard/ dashboard/
+COPY audit.log /data/audit.log
+ENV PYTHONPATH=/app
+ENV AUDIT_LOG_FILE=/data/audit.log
+RUN groupadd -r dash && useradd -r -g dash dash
+USER dash
+EXPOSE 5000
+CMD ["python", "-m", "dashboard.app"]
+""", "Dockerfile / Dockerfile.dashboard")
 
     doc.add_heading("7.2 Docker Compose", level=2)
-    doc.add_paragraph("Stack de 3 services avec ordre de démarrage explicite :")
+    doc.add_paragraph("Stack de 4 services avec ordre de démarrage explicite :")
     services = [
         ("postgres", "PostgreSQL 15", "Aucune dépendance"),
         ("keycloak", "Keycloak (OIDC)", "Dépend de postgres"),
         ("mcp-server", "Serveur MCP (ce dépôt)", "Dépend de keycloak"),
+        ("dashboard", "Flask Dashboard", "Dépend de keycloak"),
     ]
     add_styled_table(doc, ["Service", "Image", "Dépendances"], services, [3, 5, 5])
 
@@ -463,6 +488,13 @@ ENTRYPOINT ["python", "-m", "src.server"]
         ("LLM_MODEL", "Modèle Ollama (qwen2.5)"),
         ("MCP_TRANSPORT", "Mode transport (stdio/http)"),
         ("FASTMCP_HOST / PORT", "Adresse d'écoute HTTP"),
+        ("FLASK_APP", "Point d'entrée Flask (dashboard/app.py)"),
+        ("FLASK_SECRET_KEY", "Clé secrète Flask (32 caractères)"),
+        ("DASHBOARD_CLIENT_ID", "ID client Keycloak du dashboard"),
+        ("DASHBOARD_CLIENT_SECRET", "Secret client du dashboard"),
+        ("DASHBOARD_REDIRECT_URI", "URI de callback OIDC du dashboard"),
+        ("DASHBOARD_PORT", "Port du dashboard (5000)"),
+        ("AUDIT_LOG_FILE", "Chemin vers le fichier audit.log"),
     ]
     add_styled_table(doc, ["Variable", "Description"], env_vars, [5, 11])
 
@@ -479,7 +511,10 @@ ollama serve &
 # 3. Serveur MCP
 python -m src.server --transport http --port 3000
 
-# 4. Tests
+# 4. Dashboard
+python -m dashboard.app   # Port 5000
+
+# 5. Tests
 python -m pytest tests/ -v
 """, "Shell")
 
@@ -580,10 +615,206 @@ bash scripts/demo_http.sh
 
     doc.add_page_break()
 
-    # ── 10. CONCLUSION ─────────────────────────────────────────────
-    doc.add_heading("10. Conclusion", level=1)
+    # ── 10. DASHBOARD MONITORING ─────────────────────────────────
+    doc.add_heading("10. Dashboard Monitoring", level=1)
 
-    doc.add_heading("10.1 Récapitulatif", level=2)
+    doc.add_paragraph(
+        "Le projet intègre un dashboard web de monitoring en temps réel pour visualiser "
+        "les actions auditées du serveur MCP. Cette interface full-stack est construite avec "
+        "Flask (backend) et Bootstrap 5 + Chart.js (frontend), connectée au journal d'audit "
+        "via des Server-Sent Events (SSE)."
+    )
+
+    doc.add_heading("10.1 Stack Technique Frontend", level=2)
+    frontend_stack = [
+        ("Framework Backend", "Flask 3.0+", "Routing, sessions, templating Jinja2"),
+        ("Auth OIDC", "Authlib 1.3+", "Connexion Keycloak (authorization code flow)"),
+        ("CSS Framework", "Bootstrap 5.3.3", "Grille responsive, composants UI, thème sombre"),
+        ("Icônes", "Bootstrap Icons 1.11.3", "Iconographie vectorielle (CDN)"),
+        ("Graphiques", "Chart.js 4.4.4", "4 types : line, doughnut, bar, horizontal bar"),
+        ("JavaScript", "Vanilla JS (ES6 strict)", "IIFE, aucune dépendance npm, sans bundler"),
+        ("Temps Réel", "Server-Sent Events", "EventSource natif, reconnexion auto 3s"),
+        ("Templating", "Jinja2", "SSR côté Flask, blocks hérités"),
+        ("Notifications", "Bootstrap Toast", "Alertes temps réel (BLOCKED / SUSPICIOUS)"),
+    ]
+    add_styled_table(doc, ["Composant", "Technologie", "Détails"], frontend_stack, [4, 4, 8])
+
+    doc.add_heading("10.2 Architecture du Dashboard", level=2)
+    doc.add_paragraph(
+        "Le dashboard suit une architecture client-serveur classique avec rendu côté serveur "
+        "(SSR) et mises à jour en temps réel via SSE. Le flux de données est le suivant :"
+    )
+
+    add_code_block(doc, """
+┌───────────────────┐     HTTP / SSE      ┌──────────────────┐     JSONL     ┌──────────────┐
+│  Navigateur       │ ◄─────────────────► │  Flask (app.py)  │ ◄────────────►│  audit.log   │
+│  Bootstrap 5.3    │    Jinja2 + API     │  Port 5000       │  pollling 1s  │  (JSONL)     │
+│  Chart.js 4.4     │                     │                  │               └──────────────┘
+│  Vanilla JS       │                     │  Routes:         │
+│  EventSource      │                     │  / (dashboard)   │     OIDC      ┌──────────────┐
+│                   │                     │  /timeline       │ ◄────────────►│  Keycloak    │
+│  sse.js           │                     │  /api/stats      │               │  Port 8080   │
+│  dashboard.js     │                     │  /api/entries    │               └──────────────┘
+│  timeline.js      │                     │  /api/events SSE │
+└───────────────────┘                     │  /auth/*         │
+                                          └──────────────────┘""")
+
+    doc.add_heading("10.3 Structure des Fichiers", level=2)
+    files = [
+        ("dashboard/app.py", "263", "Application Flask, routes, API, SSE, watcher daemon"),
+        ("dashboard/auth.py", "55", "Connexion OIDC Keycloak (Authlib)"),
+        ("dashboard/audit_reader.py", "154", "Lecture JSONL, filtrage, statistiques, tail SSE"),
+        ("dashboard/templates/base.html", "72", "Layout sidebar + contenu principal (Jinja2)"),
+        ("dashboard/templates/login.html", "30", "Page de connexion Keycloak (autonome)"),
+        ("dashboard/templates/dashboard.html", "152", "Vue globale : KPI, graphiques, utilisateurs actifs"),
+        ("dashboard/templates/timeline.html", "119", "Timeline filtrable et paginée des audits"),
+        ("dashboard/static/css/style.css", "112", "Overrides CSS thème sombre + print"),
+        ("dashboard/static/js/sse.js", "73", "Client SSE, toasts, event bus (CustomEvent)"),
+        ("dashboard/static/js/dashboard.js", "171", "Chart.js, KPI, filtre temporel, refresh auto"),
+        ("dashboard/static/js/timeline.js", "163", "Pagination, filtres, modal détail, XSS protection"),
+        ("dashboard/mcp_client.py", "200", "Client MCP Streamable HTTP brut (httpx, streaming SSE + élicitation)"),
+        ("dashboard/templates/tools.html", "150", "Console MCP : formulaire dynamique + carte HITL"),
+        ("dashboard/static/js/tools.js", "225", "Sélecteur d'outils, dry_run auto, approbation HITL"),
+    ]
+    add_styled_table(doc, ["Fichier", "Lignes", "Rôle"], files, [5, 2, 9])
+
+    doc.add_heading("10.4 Pages et Fonctionnalités", level=2)
+
+    doc.add_heading("10.4.1 Page Dashboard (/)", level=3)
+    doc.add_paragraph(
+        "Page d'accueil offrant une vue d'ensemble des actions auditées. Elle comprend :"
+    )
+    dashboard_features = [
+        "Filtres temporels rapides : 24h, 7 jours, 30 jours, Tout",
+        "4 cartes KPI : Total audité, BLOCKED, SUSPICIOUS, Utilisateurs actifs",
+        "Graphique activité quotidienne (line chart avec area fill)",
+        "Répartition des verdicts (doughnut chart : SAFE/SUSPICIOUS/BLOCKED)",
+        "Top 10 des outils utilisés (barre horizontale)",
+        "Activité par heure de la journée (barres verticales, 24 buckets)",
+        "Tableau des utilisateurs actifs avec barres de progression",
+        "Export JSON/CSV des données filtrées",
+    ]
+    for feature in dashboard_features:
+        doc.add_paragraph(feature, style="List Bullet")
+
+    doc.add_heading("10.4.2 Page Timeline (/timeline)", level=3)
+    doc.add_paragraph(
+        "Vue détaillée et filtrable du journal d'audit complet :"
+    )
+    timeline_features = [
+        "Filtres avancés : outil, utilisateur, verdict, statut, plage de dates, recherche texte",
+        "Pagination côté serveur (25/50/100 par page)",
+        "Badges colorés DRY/LIVE, verdict et statut",
+        "Modal de détail avec métadonnées et paramètres complets",
+        "Protection XSS via fonction esc() (DOM-based escaping)",
+        "Export CSV/JSON avec filtres appliqués",
+        "Formatage français (toLocaleString('fr-FR'))",
+    ]
+    for feature in timeline_features:
+        doc.add_paragraph(feature, style="List Bullet")
+
+    doc.add_heading("10.5 Temps Réel — Server-Sent Events", level=2)
+    doc.add_paragraph(
+        "Le dashboard reçoit les nouvelles entrées d'audit en temps réel via SSE, "
+        "complété par un rafraîchissement périodique de 30 secondes en cas de déconnexion."
+    )
+
+    sse_steps = [
+        "1. Un thread daemon poll audit.log toutes les secondes",
+        "2. Les nouvelles entrées sont broadcastées aux clients via queue/thread-safe",
+        "3. Le navigateur (EventSource) reçoit les événements JSON",
+        "4. Les verdicts BLOCKED/SUSPICIOUS déclenchent des toast notifications",
+        "5. Un CustomEvent('audit:new') notifie dashboard.js et timeline.js pour refresh",
+        "6. Reconnexion automatique avec backoff de 3 secondes en cas d'erreur",
+    ]
+    for step in sse_steps:
+        doc.add_paragraph(step, style="List Bullet")
+
+    doc.add_heading("10.6 Authentification OIDC", level=2)
+    doc.add_paragraph(
+        "Le dashboard utilise un flux OIDC authorization code via Keycloak, séparé du client "
+        "MCP. L'authentification est gérée par Authlib avec découverte automatique des "
+        "endpoints via /.well-known/openid-configuration."
+    )
+
+    auth_flow = [
+        "1. L'utilisateur accède à / → redirigé vers /login si non authentifié",
+        "2. Clic sur 'Se connecter avec Keycloak' → /auth/start",
+        "3. Redirection vers Keycloak (port 8080) pour l'authentification",
+        "4. Callback OIDC → extraction du token userinfo (username, email, roles)",
+        "5. Stockage en session Flask (cookie signé) → accès aux pages protégées",
+    ]
+    for step in auth_flow:
+        doc.add_paragraph(step, style="List Bullet")
+
+    doc.add_heading("10.7 Design UI", level=2)
+    doc.add_paragraph(
+        "Le dashboard utilise un thème sombre cohérent avec le dark mode Bootstrap :"
+    )
+    design_items = [
+        ("Fond principal", "#212529 (Bootstrap dark)"),
+        ("Cartes / Sidebar", "#212529, bordure #343a40"),
+        ("Texte", "Blanc (#fff), muted (#adb5bd)"),
+        ("Accent", "Bleu Bootstrap #0d6efd"),
+        ("Danger", "Rouge #dc3545 (BLOCKED)"),
+        ("Warning", "Jaune #ffc107 (SUSPICIOUS)"),
+        ("Success", "Vert #198754 (SAFE)"),
+        ("Info", "Cyan #0dcaf0"),
+        ("Impression", "Fond blanc, texte noir, sidebar masquée"),
+    ]
+    add_styled_table(doc, ["Élément", "Valeur"], design_items, [4, 12])
+
+    doc.add_heading("10.8 Console MCP (exécution d'outils)", level=2)
+    doc.add_paragraph(
+        "La page /tools transforme le dashboard en console d'exécution : l'utilisateur "
+        "connecté liste les 19 outils exposés par le serveur MCP, renseigne les paramètres "
+        "via un formulaire généré dynamiquement depuis l'inputSchema, et exécute l'action. "
+        "La présence d'élémentations (HITL) rend la console sûre pour la vraie exploitation : "
+        "toute action destructive est d'abord simulée, puis soumise à validation humaine."
+    )
+
+    doc.add_heading("10.8.1 Client MCP maison (mcp_client.py)", level=3)
+    doc.add_paragraph(
+        "Le SDK officiel mcp 1.29.0 (transport streamable HTTP) est incompatible avec le "
+        "serveur FastMCP 3.4.7 (erreurs 400 sur POST, 404 sur le GET SSE). Un client léger "
+        "a donc été implémenté en protocole brut via httpx :"
+    )
+    mcp_client_items = [
+        "initialize POST → capture du header mcp-session-id, puis notifications/initialized",
+        "tools/list → rendu de la liste, du schéma et des annotations (destructiveHint)",
+        "tools/call en STREAM pour lire le flux SSE incrémentalement",
+        "Élication : lorsqu'un event elicitation/create arrive dans le flux (mode form, JSON-RPC id), le client y répond immédiatement par un second POST portant le même id et la décision (approve/decline) — évite le blocage du serveur qui attend la réponse avant de clore le flux",
+        "Réinjection du token Keycloak en argument token de chaque appel (validation RBAC côté serveur)",
+    ]
+    for item in mcp_client_items:
+        doc.add_paragraph(item, style="List Bullet")
+
+    doc.add_heading("10.8.2 Flux de validation HITL", level=3)
+    hitl_flow = [
+        "1. Premier clic « Exécuter » : le JS force toujours dry_run=True → l'outil SIMULE l'action et journalise DRY_RUN, sans effet système",
+        "2. Pour un outil marqué destructif, une carte « Validation humaine » (APPROUVER / DÉCLINER) apparaît sous le formulaire",
+        "3. APPROUVER : ré-exécution avec dry_run=False + preApprove → le serveur déclenche l'élicitation MCP",
+        "4. Le client répond APPROVE (JSON-RPC) ; le serveur exécute l'action, journalise APPROVED puis EXECUTED",
+        "5. DÉCLINER ou absence d'approbation : fail-closed → action REFUSÉE, audit status DECLINED/BLOCKED",
+    ]
+    for step in hitl_flow:
+        doc.add_paragraph(step, style="List Bullet")
+
+    doc.add_heading("10.8.3 Déploiement", level=3)
+    doc.add_paragraph(
+        "En docker-compose, le serveur MCP écoute en transport HTTP sur 0.0.0.0:3000 "
+        "(variables MCP_TRANSPORT, FASTMCP_HOST, FASTMCP_PORT) et le dashboard lit "
+        "MCP_SERVER_URL=http://mcp-server:3000/mcp. Le dashboard monte audit.log en lecture "
+        "et s'authentifie auprès de Keycloak via host.docker.internal pour joindre l'hôte "
+        "(KEYCLOAK_URL interne ≠ URL publique du navigateur)."
+    )
+
+    doc.add_page_break()
+
+    # ── 11. CONCLUSION ─────────────────────────────────────────────
+    doc.add_heading("11. Conclusion", level=1)
+
+    doc.add_heading("11.1 Récapitulatif", level=2)
     doc.add_paragraph(
         "Le projet DevOps Assistant MCP Server constitue une solution complète et sécurisée "
         "pour l'orchestration du cycle de vie DevOps. Les points forts sont :"
@@ -597,17 +828,18 @@ bash scripts/demo_http.sh
         "Intégration d'un LLM local pour l'analyse intelligente du code",
         "Suite de tests complète (53 tests) avec couverture de code",
         "Déploiement conteneurisé avec Docker Compose",
+        "Dashboard web de monitoring en temps réel (Flask + Bootstrap + SSE)",
     ]
     for item in recap:
         doc.add_paragraph(item, style="List Bullet")
 
-    doc.add_heading("10.2 Perspectives", level=2)
+    doc.add_heading("11.2 Perspectives", level=2)
     perspectives = [
         "Extension à d'autres fournisseurs CI/CD (GitLab CI, Jenkins)",
         "Intégration de modèles LLM supplémentaires (Gemma, Llama)",
-        "Dashboard web pour le monitoring des actions auditées",
         "Système d'alertes temps réel pour les menaces de sécurité",
         "Pipeline d'intégration continue (GitHub Actions) pour le projet lui-même",
+        "Export des rapports en PDF directement depuis le dashboard",
     ]
     for item in perspectives:
         doc.add_paragraph(item, style="List Bullet")

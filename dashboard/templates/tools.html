@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Console MCP{% endblock %}
+
+{% block page_title %}<i class="bi bi-tools"></i> Console MCP — Exécution d'outils DevOps{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Sélecteur d'outil -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-box-seam"></i> Sélection de l'outil</div>
+            <div class="card-body">
+                <label for="tool-select" class="form-label">Outil MCP</label>
+                <select id="tool-select" class="form-select">
+                    <option value="">— Chargement des outils… —</option>
+                </select>
+                <div id="tool-desc" class="form-text text-info mt-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulaire de paramètres -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-sliders"></i> Paramètres</div>
+            <div class="card-body">
+                <div id="param-form" class="row g-3">
+                    <div class="col-12 text-muted">Sélectionnez un outil pour configurer ses paramètres.</div>
+                </div>
+                <button class="btn btn-primary mt-3 d-none" id="btn-execute">
+                    <i class="bi bi-play-fill"></i> Exécuter
+                </button>
+                <span class="text-muted small">Le token d'authentification est fourni automatiquement.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- HITL : confirmation pour les actions destructrices -->
+    <div class="col-12 d-none" id="hitl-card">
+        <div class="card border-danger">
+            <div class="card-header text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Validation humaine requise (HITL)</div>
+            <div class="card-body">
+                <p>Cet outil est destructif. L'exécution réelle (dry_run=False) est <strong>validée par le serveur</strong> via élicitation MCP. Confirmez-vous ?</p>
+                <button class="btn btn-danger" id="btn-hilt-approve"><i class="bi bi-check-lg"></i> APPROUVER</button>
+                <button class="btn btn-outline-secondary" id="btn-hilt-decline">DÉCLINER</button>
+                <span class="text-muted small ms-2">En cas de doute, déclinez : aucune action ne sera exécutée (fail-closed).</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Résultat -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-terminal"></i> Résultat</div>
+            <div class="card-body p-0">
+                <pre id="result-output" class="p-3 mb-0" style="max-height: 480px; overflow: auto; white-space: pre-wrap;"><span class="text-muted">— Aucune exécution pour le moment —</span></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/tools.js') }}"></script>
+{% endblock %}

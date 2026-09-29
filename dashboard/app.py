@@ -116,6 +116,7 @@ def auth_callback():
         "name": user_info.get("name", ""),
         "roles": user_info.get("realm_access", {}).get("roles", []),
     }
+    session["access_token"] = token.get("access_token")
     return redirect(url_for("dashboard_view"))
 
 
@@ -135,7 +136,7 @@ def dashboard_view():
     entries = read_audit_log()
     stats = compute_stats(entries)
     user = get_current_user()
-    return render_template("dashboard.html", stats=stats, user=user)
+    return render_template("dashboard.html", stats=stats, user=user, active="dashboard")
 
 
 @app.route("/timeline")
@@ -154,6 +155,7 @@ def timeline_view():
         verdicts=verdicts,
         statuses=statuses,
         user=user,
+        active="timeline",
     )
 
 
@@ -257,6 +259,62 @@ def api_events():
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ============================================================
+# ROUTES CONSOLE MCP (exécution d'outils)
+# ============================================================
+
+@app.route("/tools")
+@login_required
+def tools_view():
+    user = get_current_user()
+    return render_template("tools.html", user=user, active="tools")
+
+
+@app.route("/api/tools/list")
+@login_required
+def api_tools_list():
+    token = session.get("access_token")
+    if not token:
+        return jsonify({"error": "No access token — reconnect to Keycloak."}), 401
+    try:
+        from dashboard.mcp_client import list_tools
+        tools = list_tools(token)
+        slim = []
+        for t in tools:
+            slim.append({
+                "name": t.get("name"),
+                "description": (t.get("description") or "").split("\n")[0][:120],
+                "inputSchema": t.get("inputSchema", {}),
+                "annotations": t.get("annotations", {}),
+            })
+        return jsonify({"tools": slim})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/tools/call", methods=["POST"])
+@login_required
+def api_tools_call():
+    token = session.get("access_token")
+    if not token:
+        return jsonify({"error": "No access token."}), 401
+    data = request.get_json(force=True) or {}
+    tool_name = data.get("tool")
+    arguments = data.get("arguments", {})
+    call_id = data.get("callId", f"{tool_name}-{int(__import__('time').time())}")
+    if not tool_name:
+        return jsonify({"error": "Missing 'tool' field."}), 400
+    arguments["token"] = token
+    try:
+        from dashboard.mcp_client import call_tool, pre_approve_elicitation
+        if data.get("preApprove"):
+            pre_approve_elicitation(call_id, "APPROVE")
+        result = call_tool(token, tool_name, arguments, call_id=call_id)
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"isError": True, "content": [{"type": "text", "text": str(exc)}]}), 502
 
 
 if __name__ == "__main__":

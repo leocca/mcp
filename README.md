@@ -292,6 +292,130 @@ immédiatement visible dans le dashboard (`/timeline`), qui sert de support de
 démonstration : la trace d'audit et la décision humaine sont affichées côte à
 côte.
 
+### 7.1 Architecture de l'interaction démo ↔ MCP
+
+**Vue d'ensemble** — 4 couches, un seul sens de lecture :
+
+```text
+┌──────────────────────────────────────┐
+│  CLIENT   LLM · demo_live.py · MCP Inspector
+└───────────────┬──────────────────────┘
+                │  JSON-RPC 2.0 — tools/call
+                │  (token + arguments)
+                ▼
+┌──────────────────────────────────────┐
+│  SERVEUR MCP   src/server.py         │
+│                                      │
+│  ① _user(token)     Keycloak + RBAC  │
+│  ② detect_prompt_injection()  guard  │
+│  ③ dry_run ? sinon HITL (élicitation)│
+│  ④ exécution de l'outil              │
+│  ⑤ audit_action()      → audit.log   │
+└───────────────┬──────────────────────┘
+                ▼
+┌──────────────────────────────────────┐
+│  OUTILS   src/tools/*                │
+│  git · quality · security · github · docker
+└───────────────┬──────────────────────┘
+                ▼
+   dépôt git  │  GitHub Actions  │  Docker
+```
+
+Trois règles invariants, quel que soit l'outil appelé :
+
+| Règle | Effet |
+|---|---|
+| `dry_run=True` par défaut | aucune action réelle sans demande explicite |
+| HITL obligatoire si `dry_run=False` | pas d'approbation → pas d'action (**fail-closed**) |
+| audit systématique | refus compris, tout est écrit dans `audit.log` |
+
+Détail des flux :
+
+```mermaid
+flowchart TB
+    subgraph Client["Client — scripts/demo_live.py"]
+        D["Scénario 8 phases"]
+        CLI["input() APPROVE / DECLINE<br/>(si mode interactif)"]
+    end
+
+    subgraph MCP["Serveur MCP — FastMCP"]
+        S["src/server.py<br/>19 outils + 4 prompts + 7 ressources"]
+    end
+
+    subgraph SEC["Transverse — sécurité"]
+        AUTH["_user() → verify_keycloak_token<br/>+ has_role('admin')"]
+        GRD["detect_prompt_injection<br/>(anti prompt-injection)"]
+        HITL["confirm_destructive_action<br/>(élicitation HITL)"]
+        AUD["audit_action() → audit.log JSONL"]
+    end
+
+    subgraph TOOLS["src/tools/*"]
+        GIT["git_tools"]
+        QLT["quality_tools<br/>run_tests / get_coverage"]
+        SECT["security_tools<br/>semgrep / pip-audit"]
+        GHT["github_tools"]
+        DKT["docker_tools"]
+    end
+
+    subgraph CIBLE["Systèmes cibles"]
+        REPO["dépôt git demo/"]
+        GH["GitHub Actions (API)"]
+        DK["Docker daemon"]
+    end
+
+    D -->|"lecture seule"| MCP
+    CLI -.->|"mode --auto : tranché en code"| HITL
+    MCP --> AUTH --> GRD --> TOOLS
+    TOOLS --> CIBLE
+    MCP -.->|"dry_run = False"| HITL
+    HITL -->|APPROUVÉ| TOOLS
+    HITL -->|DÉCLINÉ / pas de réponse| TOOLS
+    AUTH -.-> AUD
+    GRD -.-> AUD
+    HITL -.-> AUD
+```
+
+Chaque `@mcp.tool()` enchaîne la même séquence : **authn/RBAC** → **guard**
+anti-injection sur les entrées non fiables → **dry-run par défaut** →
+**HITL** si `dry_run=False` → **exécution réelle** → **audit** systématique
+(y compris les refus).
+
+Cas HITL — le seul chemin traversant réellement le protocole d'élicitation :
+
+```mermaid
+sequenceDiagram
+    participant C as Client (LLM ou démo)
+    participant M as Serveur MCP
+    participant S as Sécurité
+    participant D as Docker / GitHub
+
+    C->>M: rollback_deployment(token, image_tag, dry_run=False)
+    M->>S: _user(token) — Keycloak + rôle ADMIN
+    alt token invalide ou rôle insuffisant
+        S-->>M: DENIED puis audit
+        M-->>C: Accès refusé
+    end
+    M->>S: confirm_destructive_action()
+    S-->>C: élicitation — Rollback destructif, confirmer ?
+    alt APPROVE explicite
+        C-->>S: APPROVE
+        S-->>D: exécution réelle
+        S->>S: audit status=EXECUTED
+    end
+    alt DECLINE, timeout, ou silence
+        C-->>S: (rien)
+        S-->>M: refus (fail-closed)
+        S->>S: audit status=BLOCKED
+        M-->>C: Action bloquée — rien n'a été exécuté
+    end
+```
+
+> **À noter** : la démo live contourne volontairement le transport MCP (pas de
+> JSON-RPC) — elle importe `src/server.py` et appelle les outils directement avec
+> un `_user` monkeypatché en `admin` (`scripts/demo_live.py:346`). Seul
+> `trigger_pipeline` passe par le point d'entrée réel, en `dry_run=True`, d'où
+> l'absence d'élicitation dans le scénario automatique.
+
 ## 8. Structure du dépôt
 
 ```
